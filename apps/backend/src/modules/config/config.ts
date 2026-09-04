@@ -133,10 +133,27 @@ function generateBaseConfLines(settings: SettingsSchema): string[] {
 				break
 			}
 			
+			// Tell the gateway a new block arrived, so it stops handing out work
+			// built on the previous tip. Points at this fork's companion gateway
+			// rather than the official Datum app: that one mines the chain that
+			// kept SHA256d, and notifying it from here would be telling the wrong
+			// gateway about the wrong chain's blocks.
+			//
+			// Umbrel puts every app on one Docker network and names containers
+			// <app-id>_<service>_1, which is how this resolves across apps. 7152
+			// is the gateway's API port inside its own container, not the port
+			// published on the host.
 			case 'datum': {
 				if (value === true) {
-					lines.push("blocknotify=curl -s -m 5 http://datum_datum_1:21000/NOTIFY")
+					lines.push('blocknotify=curl -s -m 5 http://paulscode-datum-blake2b_gateway_1:7152/NOTIFY')
 				}
+				// Upstream is missing this break, so `datum` falls through to the
+				// default arm and `datum=1` is written into bitcoin.conf.
+				// bitcoind only warns ("Ignoring unknown configuration value
+				// datum") so nothing breaks, but the warning is on every start and
+				// the line is meaningless. Lost in the revert of the
+				// consensusrules option, which took the break with it.
+				break
 			}
 
 			// All other keys → default "key=value" (boolean→0|1, number/string as is)

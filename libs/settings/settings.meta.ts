@@ -6,9 +6,15 @@
 
 // Available Bitcoin Knots versions
 // IMPORTANT:
-// - Any version added here needs to be added in the Dockerfile
+// - Any version added here needs to be added in the Dockerfile, and the entry
+//   must match the directory name under /opt/bitcoind exactly: the bitcoind
+//   manager builds the path from this string.
 // - The array of versions must be newest → oldest. We do a simple index comparison to compare versions, so lower index = newer.
-export const AVAILABLE_BITCOIN_KNOTS_VERSIONS = ['v29.4.1.knots20260508', 'v29.4.1.knots20260508rc5', 'v29.4.1.knots20260508rc4', 'v29.4.knots20260508', 'v29.3.knots20260508', 'v29.3.knots20260507', 'v29.3.knots20260210', 'v29.2.knots20251110','v29.2', 'v29.1'] as const
+//
+// One entry, because there is one BLAKE2b build. The versions this fork removed
+// all follow the chain that kept SHA256d, so offering them would not be offering
+// older versions of this node, it would be offering the other side of the split.
+export const AVAILABLE_BITCOIN_KNOTS_VERSIONS = ['v29.4.1.knots20260508-blake2b'] as const
 
 // Default Bitcoin Knots version used by bitcoind manager (always the newest version in the array)
 export const DEFAULT_BITCOIN_KNOTS_VERSION = AVAILABLE_BITCOIN_KNOTS_VERSIONS[0]
@@ -321,7 +327,13 @@ export const settingsMetadata = {
 		// automatically prune block files to stay under the specified
 		// target size in MiB
 		// using GB and a step of 1 means users will never select between 1 MiB or <550 MiB behaviours described above
-		default: 0, // 0 disables pruning
+		//
+		// Pruned by default here, where upstream keeps everything. This node is
+		// meant to run beside a node on the other chain, and two full copies of a
+		// chain this size do not fit on the machines it is for. 5 GB is
+		// comfortably above bitcoind's 550 MiB floor and small enough that
+		// "pruned" means what a reader expects.
+		default: 5,
 		step: 1,
 		min: 0,
 		unit: 'GB',
@@ -359,19 +371,13 @@ export const settingsMetadata = {
 		bitcoinLabel: 'datacarriersize',
 		description: 'Set the maximum size of the data in OP_RETURN outputs (in bytes) that your node will relay.',
 		subDescription: 'Note: datacarrier must be enabled for this setting to take effect.',
-		default: 42,
+		// 83 from v29.2.knots20251110 onwards, which is every version this image
+		// ships. Upstream carries 42 here with a per-version override raising it,
+		// because it also ships versions older than that change; there is one
+		// version here, so the override list would have been a table with a
+		// single row restating the default.
+		default: 83,
 		unit: 'bytes',
-		versionOverrides: {
-			// v29.2.knots20251110 changed the default and max so we declare a tiny diff
-			'v29.4.1.knots20260508': {default: 83},
-			'v29.4.1.knots20260508rc5': {default: 83},
-			'v29.4.1.knots20260508rc4': {default: 83},
-			'v29.4.knots20260508': {default: 83},
-			'v29.3.knots20260508': {default: 83},
-			'v29.3.knots20260507': {default: 83},
-			'v29.3.knots20260210': {default: 83},
-			'v29.2.knots20251110': {default: 83},
-		},
 	},
 
 	permitbaremultisig: {
@@ -616,10 +622,10 @@ export const settingsMetadata = {
 	datum: {
 		tab: 'optimization',
 		kind: 'toggle',
-		label: 'Enable blocknotify for datum',
+		label: 'Notify the mining gateway of new blocks',
 		bitcoinLabel: 'datum',
 		description:
-			'Enable blocknotify for datum to avoid mining stale work.',
+			'Tell the Datum (BLAKE2b) Companion app as soon as this node accepts a new block, so it stops handing your miner work built on the previous one. Harmless if that app is not installed.',
 		default: true,
 	},
 
@@ -642,20 +648,25 @@ export const settingsMetadata = {
 	},
 
 	/* ===== Network tab ===== */
+	// Mainnet only, and the other four are removed rather than hidden.
+	//
+	// BLAKE2b is scheduled on mainnet in this build and nowhere else that is
+	// usable: regtest takes its activation height from -testactivationheight,
+	// which this app does not pass, so a regtest node here would follow SHA256d
+	// forever. testnet4's compiled activation height does not match the live
+	// testnet4 fork, so a node there stalls one block below it looking healthy.
+	// Signet and testnet3 have no BLAKE2b schedule at all.
+	//
+	// Every one of those is a node that runs, connects, and quietly does the wrong
+	// thing, which is worse than an option that is not there.
 	chain: {
 		tab: 'network',
 		kind: 'select',
 		label: 'Bitcoin Network',
 		bitcoinLabel: 'chain',
 		description:
-			'Choose which blockchain your node will connect to. If you change the chain, you may need to restart any connected apps to ensure they work correctly.',
-		options: [
-			{value: 'main', label: 'Mainnet'},
-			{value: 'test', label: 'Testnet3'},
-			{value: 'testnet4', label: 'Testnet4'},
-			{value: 'signet', label: 'Signet'},
-			{value: 'regtest', label: 'Regtest'},
-		],
+			'This node follows the BLAKE2b chain on mainnet. The proof of work changed there at block 961640 on 30 August 2026, and the other networks have no BLAKE2b schedule this build can follow.',
+		options: [{value: 'main', label: 'Mainnet'}],
 		default: 'main',
 	},
 } satisfies Record<string, VersionedOption>

@@ -19,13 +19,22 @@ export default function Header({className}: {className?: string}) {
 	const cleanedVersion = version?.version?.replace(/^v/i, '')
 	const fullVersionString = `${placeholder} ${cleanedVersion ?? ''}`
 
+	// Which chain, said plainly and on every page.
+	//
+	// Two chains have called themselves Bitcoin since August 2026 and this app
+	// looks identical to the one following the other. Someone running both, which
+	// is the arrangement this fork exists for, has two tabs open that are the same
+	// shade of blue and report the same kind of numbers. The heading is the one
+	// place guaranteed to be on screen.
+	const heading = 'Bitcoin Node (BLAKE2b)'
+
 	return (
 		<header className={cn('flex items-end md:items-center justify-between mb-6 md:mb-8 w-full', className)}>
 			<div className='flex flex-row items-center gap-2.5 md:gap-3.5'>
 				<Logo aria-label='Bitcoin Node logo' className='w-[50px] md:w-[60px] h-[50px] md:h-[60px] shrink-0' />
 				<div>
 					<h1 className='font-outfit text-[22px] md:text-[28px] font-[400] bg-text-gradient bg-clip-text text-transparent leading-none pb-1'>
-						Bitcoin Node
+						{heading}
 					</h1>
 
 					{/* We gracefully handle loading and error states for no layout shift */}

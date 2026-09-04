@@ -14,5 +14,17 @@
 **/dist
 **/build
 
+# TypeScript's incremental build state.
+#
+# Not cosmetic. `**/dist` above keeps compiled output out of the build context,
+# but apps/backend/tsconfig.tsbuildinfo sits outside dist and was still being
+# copied in. tsc then reads it, concludes everything is up to date, emits
+# nothing, and the image build fails at
+# `COPY --from=app-builder /repo/apps/backend/dist` with "not found".
+#
+# It only bites when someone has run `tsc -b` in their working tree before
+# building the image, which is exactly what anyone changing libs/settings does.
+**/*.tsbuildinfo
+
 # Local data mounts – we don't need them inside the build context
 data

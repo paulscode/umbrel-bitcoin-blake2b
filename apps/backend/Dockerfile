@@ -14,16 +14,22 @@
 ###########################################
 # Bitcoind
 ###########################################
-FROM ghcr.io/retropex/bitcoin:29.4.1.knots20260508@sha256:eab5815b272f99b33e8170a008d7ac18005c8c824383b93276c0a178e335183b AS bitcoind_29_4_3
-FROM ghcr.io/retropex/bitcoin:29.4.1.knots20260508rc5@sha256:d56e0e655218719332059608438788adf50e2ead11a8d4c47677ac51c6cfac96 AS bitcoind_29_4_2
-FROM ghcr.io/retropex/bitcoin:29.4.1.knots20260508rc4@sha256:a8e9081c9277108077c1f92436fbd7322a11cb2597da97ac301661cfc55fb64e AS bitcoind_29_4_1
-FROM ghcr.io/retropex/bitcoin:29.4.knots20260508@sha256:c8a561261565db77ef6a551013abd057d3e3ab9dea8535ba00a781b8d72d0619 AS bitcoind_29_4
-FROM ghcr.io/retropex/bitcoin:29.3.knots20260508@sha256:5dabd6ddb1eb47ab87ce5d2a1eb478472eedf2f5967993a824c3e25c6890df98 AS bitcoind_29_3_3
-FROM ghcr.io/retropex/bitcoin:29.3.knots20260507@sha256:366a8d1a939b002291a134aee6e03d1a10379f8dead646f8d30b296b88ee8380 AS bitcoind_29_3_2
-FROM ghcr.io/retropex/bitcoin:29.3.knots20260210@sha256:fde0aeddc8fd04818e91e185c9eb43980b5d1a132bdc4bdcb681b20b1fad0b94 AS bitcoind_29_3
-FROM ghcr.io/retropex/bitcoin:29.2.knots20251110@sha256:8b58084882c8abad948f2d154d46595a9147c1f4a5bd578ebabf68583905e305 AS bitcoind_29_2_2
-FROM ghcr.io/retropex/bitcoin:29.2@sha256:2e3209117dd2d6ca5239d48fb44d71c218e99280ed180499f3036aff16a4b0f8 AS bitcoind_29_2
-FROM ghcr.io/retropex/bitcoin:29.1@sha256:da5bb600703a7ed885f64dbe93a5cd970138f28319f2074b51e3544e141711ed AS bitcoind_29_1
+# The one bitcoind this image ships: Bitcoin Knots carrying the BLAKE2b
+# proof-of-work change, from paulscode/knots-blake2b-startos. That image builds it
+# from a pinned commit of bitcoinknots/bitcoin (the tag v29.4.1.knots20260508) and
+# records the commit at /etc/knots-pinned-commit.
+#
+# Upstream ships ten and offers a picker. This ships one, and the reason is not
+# tidiness. The other nine follow the chain that kept SHA256d. Selecting one would
+# not be downgrading, it would be walking onto the other side of the August 2026
+# split, onto a chain whose blocks this node's data directory cannot be used with.
+# The picker is kept, with one entry, for when there is a second BLAKE2b build to
+# choose between.
+#
+# Pinned by tag rather than digest, unlike the images this replaces, because it is
+# ours and is rebuilt as part of the same release. The commit it was built from is
+# copied in below and is the thing that actually identifies it.
+FROM paulscode/knots-blake2b:1.0.9 AS bitcoind_blake2b
 
 ##########################################################
 # Dependencies layer — install every workspace deps
@@ -54,43 +60,56 @@ WORKDIR /repo/apps/backend
 
 VOLUME /data
 
+# bitcoind's shared libraries.
+#
+# The images this fork replaced needed none: they were built to be copied into an
+# arbitrary runtime. Ours is a normal dynamically-linked Debian build, and
+# node:20-slim carries neither libevent nor libsqlite3, so without this bitcoind
+# exits immediately with
+# "error while loading shared libraries: libevent_core-2.1.so.7".
+#
+# Both bookworm, so these are the same package names the node image installs.
+# Keep this list in step with the runtime stage of
+# paulscode/knots-blake2b-startos's Dockerfile; `ldd` on the binary is the check.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libevent-core-2.1-7 libevent-extra-2.1-7 libevent-pthreads-2.1-7 \
+        libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # bitcoind binaries
-RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508 /opt/bitcoind/v29.4.1.knots20260508rc5 /opt/bitcoind/v29.4.1.knots20260508rc4 /opt/bitcoind/v29.4.knots20260508 /opt/bitcoind/v29.3.knots20260508 /opt/bitcoind/v29.3.knots20260507 /opt/bitcoind/v29.3.knots20260210 /opt/bitcoind/v29.2.knots20251110 /opt/bitcoind/v29.2 /opt/bitcoind/v29.1
-COPY --from=bitcoind_29_4_3 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508/bitcoind
-COPY --from=bitcoind_29_4_3 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_4_2 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508rc5/bitcoind
-COPY --from=bitcoind_29_4_2 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508rc5/bitcoin-cli
-COPY --from=bitcoind_29_4_1 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508rc4/bitcoind
-COPY --from=bitcoind_29_4_1 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508rc4/bitcoin-cli
-COPY --from=bitcoind_29_4 /bin/bitcoind    /opt/bitcoind/v29.4.knots20260508/bitcoind
-COPY --from=bitcoind_29_4 /bin/bitcoin-cli /opt/bitcoind/v29.4.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_3_3 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260508/bitcoind
-COPY --from=bitcoind_29_3_3 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_3_2 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260507/bitcoind
-COPY --from=bitcoind_29_3_2 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260507/bitcoin-cli
-COPY --from=bitcoind_29_3 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260210/bitcoind
-COPY --from=bitcoind_29_3 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260210/bitcoin-cli
-COPY --from=bitcoind_29_2_2 /bin/bitcoind    /opt/bitcoind/v29.2.knots20251110/bitcoind
-COPY --from=bitcoind_29_2_2 /bin/bitcoin-cli /opt/bitcoind/v29.2.knots20251110/bitcoin-cli
-COPY --from=bitcoind_29_2 /bin/bitcoind    /opt/bitcoind/v29.2/bitcoind
-COPY --from=bitcoind_29_2 /bin/bitcoin-cli /opt/bitcoind/v29.2/bitcoin-cli
-COPY --from=bitcoind_29_1 /bin/bitcoind    /opt/bitcoind/v29.1/bitcoind
-COPY --from=bitcoind_29_1 /bin/bitcoin-cli /opt/bitcoind/v29.1/bitcoin-cli
+RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508-blake2b
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoind
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoin-cli
+# The commit that binary was built from, so a running container can say exactly
+# what it is. The tag alone cannot: this is built from source, not from a signed
+# release, and a tag can be moved.
+COPY --from=bitcoind_blake2b /etc/knots-pinned-commit   /etc/knots-pinned-commit
 
 # Give 1000:1000 write permisions to /opt/bitcoind (just directory) so we can flip the symbolic link while the container runs as 1000:1000
 RUN chown 1000:1000 /opt/bitcoind
 
 # Symbolic link for default bitcoind binary
-# By default we point to the latest version of Bitcoin Knots
-RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508 /opt/bitcoind/current
+RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508-blake2b /opt/bitcoind/current
 RUN ln -sfn /opt/bitcoind/current/bitcoind    /usr/local/bin/bitcoind
 RUN ln -sfn /opt/bitcoind/current/bitcoin-cli /usr/local/bin/bitcoin-cli
 
 # Symlink for datadir so bitcoin-cli auto-finds the RPC cookie
 # Allows exec'ing bitcoin-cli inside the container without specifying credentials
-RUN ln -sfn /data/bitcoin /root/.bitcoin
+#
+# /data, not /data/bitcoin, and it MUST agree with BITCOIN_DIR below. Upstream
+# puts the chain in a `bitcoin` subdirectory; this app has kept it at the root of
+# its data volume since it shipped, and moving it would mean asking every
+# existing install to relocate several gigabytes of blocks.
+#
+# Getting this wrong is not a dangling symlink nobody notices. `bitcoind
+# --version` creates the default datadir's `wallets` directory on the way past,
+# so it fails outright on a symlink pointing nowhere. The bitcoind manager probes
+# the binary that way to fill the version banner, catches the failure, and reports
+# "unknown", which is how this was found: a working node with no version in its
+# header.
+RUN ln -sfn /data /root/.bitcoin
 RUN mkdir -p /home/node \
- && ln -sfn /data/bitcoin /home/node/.bitcoin \
+ && ln -sfn /data /home/node/.bitcoin \
  && chown -h 1000:1000 /home/node/.bitcoin
 
 CMD ["npm","run","dev"]
@@ -130,43 +149,56 @@ COPY --from=app-builder /repo/apps/ui/dist ./dist/public
 COPY --from=app-builder /repo/libs/settings/dist ./libs/settings/dist
 COPY --from=app-builder /repo/libs/shared-types/dist ./libs/shared-types/dist
 
+# bitcoind's shared libraries.
+#
+# The images this fork replaced needed none: they were built to be copied into an
+# arbitrary runtime. Ours is a normal dynamically-linked Debian build, and
+# node:20-slim carries neither libevent nor libsqlite3, so without this bitcoind
+# exits immediately with
+# "error while loading shared libraries: libevent_core-2.1.so.7".
+#
+# Both bookworm, so these are the same package names the node image installs.
+# Keep this list in step with the runtime stage of
+# paulscode/knots-blake2b-startos's Dockerfile; `ldd` on the binary is the check.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libevent-core-2.1-7 libevent-extra-2.1-7 libevent-pthreads-2.1-7 \
+        libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # bitcoind binaries
-RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508 /opt/bitcoind/v29.4.1.knots20260508rc5 /opt/bitcoind/v29.4.1.knots20260508rc4 /opt/bitcoind/v29.4.knots20260508 /opt/bitcoind/v29.3.knots20260508 /opt/bitcoind/v29.3.knots20260507 /opt/bitcoind/v29.3.knots20260210 /opt/bitcoind/v29.2.knots20251110 /opt/bitcoind/v29.2 /opt/bitcoind/v29.1
-COPY --from=bitcoind_29_4_3 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508/bitcoind
-COPY --from=bitcoind_29_4_3 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_4_2 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508rc5/bitcoind
-COPY --from=bitcoind_29_4_2 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508rc5/bitcoin-cli
-COPY --from=bitcoind_29_4_1 /bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508rc4/bitcoind
-COPY --from=bitcoind_29_4_1 /bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508rc4/bitcoin-cli
-COPY --from=bitcoind_29_4 /bin/bitcoind    /opt/bitcoind/v29.4.knots20260508/bitcoind
-COPY --from=bitcoind_29_4 /bin/bitcoin-cli /opt/bitcoind/v29.4.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_3_3 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260508/bitcoind
-COPY --from=bitcoind_29_3_3 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260508/bitcoin-cli
-COPY --from=bitcoind_29_3_2 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260507/bitcoind
-COPY --from=bitcoind_29_3_2 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260507/bitcoin-cli
-COPY --from=bitcoind_29_3 /bin/bitcoind    /opt/bitcoind/v29.3.knots20260210/bitcoind
-COPY --from=bitcoind_29_3 /bin/bitcoin-cli /opt/bitcoind/v29.3.knots20260210/bitcoin-cli
-COPY --from=bitcoind_29_2_2 /bin/bitcoind    /opt/bitcoind/v29.2.knots20251110/bitcoind
-COPY --from=bitcoind_29_2_2 /bin/bitcoin-cli /opt/bitcoind/v29.2.knots20251110/bitcoin-cli
-COPY --from=bitcoind_29_2 /bin/bitcoind    /opt/bitcoind/v29.2/bitcoind
-COPY --from=bitcoind_29_2 /bin/bitcoin-cli /opt/bitcoind/v29.2/bitcoin-cli
-COPY --from=bitcoind_29_1 /bin/bitcoind    /opt/bitcoind/v29.1/bitcoind
-COPY --from=bitcoind_29_1 /bin/bitcoin-cli /opt/bitcoind/v29.1/bitcoin-cli
+RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508-blake2b
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoind
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoin-cli
+# The commit that binary was built from, so a running container can say exactly
+# what it is. The tag alone cannot: this is built from source, not from a signed
+# release, and a tag can be moved.
+COPY --from=bitcoind_blake2b /etc/knots-pinned-commit   /etc/knots-pinned-commit
 
 # Give 1000:1000 write permisions to /opt/bitcoind (just directory) so we can flip the symbolic link while the container runs as 1000:1000
 RUN chown 1000:1000 /opt/bitcoind
 
 # Symbolic link for default bitcoind binary
-# By default we point to the latest version of Bitcoin Knots
-RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508 /opt/bitcoind/current
+RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508-blake2b /opt/bitcoind/current
 RUN ln -sfn /opt/bitcoind/current/bitcoind    /usr/local/bin/bitcoind
 RUN ln -sfn /opt/bitcoind/current/bitcoin-cli /usr/local/bin/bitcoin-cli
 
 # Symlink for datadir so bitcoin-cli auto-finds the RPC cookie
 # Allows exec'ing bitcoin-cli inside the container without specifying credentials
-RUN ln -sfn /data/bitcoin /root/.bitcoin
+#
+# /data, not /data/bitcoin, and it MUST agree with BITCOIN_DIR below. Upstream
+# puts the chain in a `bitcoin` subdirectory; this app has kept it at the root of
+# its data volume since it shipped, and moving it would mean asking every
+# existing install to relocate several gigabytes of blocks.
+#
+# Getting this wrong is not a dangling symlink nobody notices. `bitcoind
+# --version` creates the default datadir's `wallets` directory on the way past,
+# so it fails outright on a symlink pointing nowhere. The bitcoind manager probes
+# the binary that way to fill the version banner, catches the failure, and reports
+# "unknown", which is how this was found: a working node with no version in its
+# header.
+RUN ln -sfn /data /root/.bitcoin
 RUN mkdir -p /home/node \
- && ln -sfn /data/bitcoin /home/node/.bitcoin \
+ && ln -sfn /data /home/node/.bitcoin \
  && chown -h 1000:1000 /home/node/.bitcoin
 
  RUN apt-get update && apt-get install -y \
@@ -175,8 +207,12 @@ RUN mkdir -p /home/node \
 
 ENV NODE_ENV=production
 
-# Data dirs inside /data
-ENV BITCOIN_DIR=/data/bitcoin
+# Data dirs inside /data.
+#
+# BITCOIN_DIR must match the .bitcoin symlinks above; see the note there. The
+# app's compose file sets both of these explicitly too, so the choice is visible
+# where someone reads the app rather than only here.
+ENV BITCOIN_DIR=/data
 ENV APP_STATE_DIR=/data/app
 
 # 3000 = HTTP API, 8332 = RPC, 8333 = P2P
