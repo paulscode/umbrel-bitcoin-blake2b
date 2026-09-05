@@ -82,8 +82,40 @@ app
 // Log unhandled rejections
 process.on('unhandledRejection', (reason) => app.log.error({reason}, 'Unhandled rejection'))
 
-// Graceful shutdown of bitcoind
+// Graceful shutdown of bitcoind.
+//
+// The last line of defence, not the first. `bitcoind.stop()` is itself bounded
+// and escalates to SIGKILL, so reaching this timer means something above it is
+// wedged rather than merely slow. Either way the process must leave: when it did
+// not, Docker held the container for the whole stop_grace_period and every app
+// update looked like it had hung at 99%.
+//
+// Repeated signals are ignored rather than starting a second shutdown, since
+// Docker sends SIGTERM once and then SIGKILLs, and a second pass would race the
+// first over the same child.
 // TODO: fix for dev: [tsx] Previous process hasn't exited yet. Force killing...
-const shutdown = () => bitcoind.stop().then(() => process.exit(0))
+const SHUTDOWN_DEADLINE_MS = 11 * 60 * 1000
+let shuttingDown = false
+
+const shutdown = () => {
+	if (shuttingDown) return
+	shuttingDown = true
+
+	const deadline = setTimeout(() => {
+		app.log.error('Shutdown did not complete in time; exiting anyway')
+		process.exit(1)
+	}, SHUTDOWN_DEADLINE_MS)
+	// Do not let the timer itself hold the event loop open.
+	deadline.unref?.()
+
+	bitcoind
+		.stop()
+		.catch((error) => app.log.error({error}, 'Error stopping bitcoind during shutdown'))
+		.finally(() => {
+			clearTimeout(deadline)
+			process.exit(0)
+		})
+}
+
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)

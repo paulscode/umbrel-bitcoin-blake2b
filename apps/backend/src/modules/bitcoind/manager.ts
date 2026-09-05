@@ -210,17 +210,59 @@ export class BitcoindManager {
 		})
 	}
 
-	// Gracefully stop bitcoind
-	async stop() {
-		if (!this.child) return
+	// Gracefully stop bitcoind.
+	//
+	// BOUNDED ON PURPOSE. This used to await the child's 'exit' event with no
+	// timeout, which is only safe if that event is guaranteed to arrive. It is
+	// not: a child that has already exited emits nothing more, and a bitcoind
+	// wedged mid-flush may take longer than anything upstream is willing to wait.
+	// When this never resolved, the caller's `process.exit(0)` never ran, the
+	// container ignored SIGTERM, and Docker sat on it for the whole
+	// stop_grace_period (15m30s for these apps) before SIGKILL. Every update of
+	// the app appeared to hang at 99% for a quarter of an hour.
+	//
+	// So: return immediately if the child is already gone, and escalate to
+	// SIGKILL if it will not leave. `stopTimeoutMs` is well inside the compose
+	// grace period, which exists so bitcoind can flush its chainstate; this only
+	// takes over once waiting longer has stopped being useful.
+	async stop(stopTimeoutMs = 10 * 60 * 1000) {
+		const child = this.child
+		if (!child) return
+
+		// Already reaped: no further 'exit' event is coming, so awaiting one
+		// would hang forever.
+		if (child.exitCode !== null || child.signalCode !== null) {
+			this.child = null
+			this.startedAt = null
+			return
+		}
 
 		// Emit stop event for zmq hashtx subscriber
 		this.events.emit('stop')
 
 		// we don't want to emit an exit event if we are purposefully stopping bitcoind
 		this.expectingExit = true
-		this.child.kill('SIGTERM')
-		await new Promise((res) => this.child?.once('exit', res))
+
+		const exited = new Promise<void>((res) => child.once('exit', () => res()))
+		child.kill('SIGTERM')
+
+		let timer: NodeJS.Timeout | undefined
+		const timedOut = new Promise<'timeout'>((res) => {
+			timer = setTimeout(() => res('timeout'), stopTimeoutMs)
+		})
+
+		try {
+			if ((await Promise.race([exited.then(() => 'exited' as const), timedOut])) === 'timeout') {
+				console.error(
+					`[bitcoind-manager] did not exit ${stopTimeoutMs}ms after SIGTERM; sending SIGKILL`,
+				)
+				child.kill('SIGKILL')
+				await exited
+			}
+		} finally {
+			if (timer) clearTimeout(timer)
+		}
+
 		this.expectingExit = false
 		this.child = null
 		this.startedAt = null
