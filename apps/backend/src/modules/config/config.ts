@@ -67,6 +67,27 @@ function applyDerivedSettings(settings: SettingsSchema): SettingsSchema {
 	// If prune > 0 -> txindex must be off
 	if (newSettings['prune'] > 0) newSettings['txindex'] = false
 
+	// If prune > 0 -> the block filter index must be off, and so must the peer
+	// service that requires it.
+	//
+	// bitcoind refuses to start outright when the index needs blocks that have
+	// already been pruned: "Index 'basic block filter index' needs block data that
+	// has been pruned ... Failed to start indexes, shutting down." That is a fatal
+	// exit, not a warning, so the node simply does not come up.
+	//
+	// Upstream does not need this rule because the app it was written for is
+	// archival by default. This one prunes by default, which makes the pairing
+	// reachable in ordinary use: turning Peer Block Filters on in Advanced Settings
+	// sets blockfilterindex above, and the next bitcoind start fails.
+	//
+	// Ordered after the peerblockfilters rule deliberately, so it overrides rather
+	// than races it. Same shape as the txindex rule above, for the same reason:
+	// pruning and a full index cannot both be true.
+	if (newSettings['prune'] > 0) {
+		newSettings['blockfilterindex'] = false
+		newSettings['peerblockfilters'] = false
+	}
+
 	// If proxy is on, but onlynet doesn't include clearnet and tor -> disable proxy
 	if (
 		newSettings['proxy'] &&
