@@ -29,7 +29,7 @@
 # Pinned by tag rather than digest, unlike the images this replaces, because it is
 # ours and is rebuilt as part of the same release. The commit it was built from is
 # copied in below and is the thing that actually identifies it.
-FROM paulscode/knots-blake2b:1.0.9 AS bitcoind_blake2b
+FROM paulscode/knots-blake2b:1.0.10 AS bitcoind_blake2b
 
 ##########################################################
 # Dependencies layer — install every workspace deps
