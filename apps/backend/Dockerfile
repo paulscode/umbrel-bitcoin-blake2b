@@ -64,7 +64,8 @@ VOLUME /data
 #
 # The images this fork replaced needed none: they were built to be copied into an
 # arbitrary runtime. Ours is a normal dynamically-linked Debian build, and
-# node:20-slim carries neither libevent nor libsqlite3, so without this bitcoind
+# node:20-slim carries neither libevent nor libsqlite3 nor libzmq (which
+# knots-blake2b 1.0.10 links, for ZeroMQ), so without this bitcoind
 # exits immediately with
 # "error while loading shared libraries: libevent_core-2.1.so.7".
 #
@@ -73,7 +74,7 @@ VOLUME /data
 # paulscode/knots-blake2b-startos's Dockerfile; `ldd` on the binary is the check.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libevent-core-2.1-7 libevent-extra-2.1-7 libevent-pthreads-2.1-7 \
-        libsqlite3-0 \
+        libsqlite3-0 libzmq5 \
     && rm -rf /var/lib/apt/lists/*
 
 # bitcoind binaries
@@ -153,7 +154,8 @@ COPY --from=app-builder /repo/libs/shared-types/dist ./libs/shared-types/dist
 #
 # The images this fork replaced needed none: they were built to be copied into an
 # arbitrary runtime. Ours is a normal dynamically-linked Debian build, and
-# node:20-slim carries neither libevent nor libsqlite3, so without this bitcoind
+# node:20-slim carries neither libevent nor libsqlite3 nor libzmq (which
+# knots-blake2b 1.0.10 links, for ZeroMQ), so without this bitcoind
 # exits immediately with
 # "error while loading shared libraries: libevent_core-2.1.so.7".
 #
@@ -162,7 +164,7 @@ COPY --from=app-builder /repo/libs/shared-types/dist ./libs/shared-types/dist
 # paulscode/knots-blake2b-startos's Dockerfile; `ldd` on the binary is the check.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libevent-core-2.1-7 libevent-extra-2.1-7 libevent-pthreads-2.1-7 \
-        libsqlite3-0 \
+        libsqlite3-0 libzmq5 \
     && rm -rf /var/lib/apt/lists/*
 
 # bitcoind binaries
