@@ -14,7 +14,11 @@
 // One entry, because there is one BLAKE2b build. The versions this fork removed
 // all follow the chain that kept SHA256d, so offering them would not be offering
 // older versions of this node, it would be offering the other side of the split.
-export const AVAILABLE_BITCOIN_KNOTS_VERSIONS = ['v29.4.1.knots20260508-blake2b'] as const
+// A settings value saved before this release still names the previous entry,
+// 'v29.4.1.knots20260508-blake2b'. It is deliberately not listed here: the image
+// symlinks that directory to this one, so the stored value still resolves to a
+// binary, and listing it would offer a second choice that is the same build.
+export const AVAILABLE_BITCOIN_KNOTS_VERSIONS = ['v29.4.2.knots20260508rc2-blake2b'] as const
 
 // Default Bitcoin Knots version used by bitcoind manager (always the newest version in the array)
 export const DEFAULT_BITCOIN_KNOTS_VERSION = AVAILABLE_BITCOIN_KNOTS_VERSIONS[0]

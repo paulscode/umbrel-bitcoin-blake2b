@@ -16,7 +16,7 @@
 ###########################################
 # The one bitcoind this image ships: Bitcoin Knots carrying the BLAKE2b
 # proof-of-work change, from paulscode/knots-blake2b-startos. That image builds it
-# from a pinned commit of bitcoinknots/bitcoin (the tag v29.4.1.knots20260508) and
+# from a pinned commit of bitcoinknots/bitcoin (the tag v29.4.2.knots20260508rc2) and
 # records the commit at /etc/knots-pinned-commit.
 #
 # Upstream ships ten and offers a picker. This ships one, and the reason is not
@@ -29,7 +29,7 @@
 # Pinned by tag rather than digest, unlike the images this replaces, because it is
 # ours and is rebuilt as part of the same release. The commit it was built from is
 # copied in below and is the thing that actually identifies it.
-FROM paulscode/knots-blake2b:1.0.10 AS bitcoind_blake2b
+FROM paulscode/knots-blake2b:1.0.11 AS bitcoind_blake2b
 
 ##########################################################
 # Dependencies layer — install every workspace deps
@@ -78,9 +78,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # bitcoind binaries
-RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508-blake2b
-COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoind
-COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoin-cli
+RUN mkdir -p /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b/bitcoind
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b/bitcoin-cli
 # The commit that binary was built from, so a running container can say exactly
 # what it is. The tag alone cannot: this is built from source, not from a signed
 # release, and a tag can be moved.
@@ -89,8 +89,15 @@ COPY --from=bitcoind_blake2b /etc/knots-pinned-commit   /etc/knots-pinned-commit
 # Give 1000:1000 write permisions to /opt/bitcoind (just directory) so we can flip the symbolic link while the container runs as 1000:1000
 RUN chown 1000:1000 /opt/bitcoind
 
+# A settings value stored before this release still names the old directory, and
+# the bitcoind manager builds its path straight from that string, so leave the
+# old name resolving to the same binary. Without it an explicit version choice
+# saved earlier points at a directory this image no longer has, and bitcoind
+# does not start.
+RUN ln -sfn /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b /opt/bitcoind/v29.4.1.knots20260508-blake2b
+
 # Symbolic link for default bitcoind binary
-RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508-blake2b /opt/bitcoind/current
+RUN ln -sfn /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b /opt/bitcoind/current
 RUN ln -sfn /opt/bitcoind/current/bitcoind    /usr/local/bin/bitcoind
 RUN ln -sfn /opt/bitcoind/current/bitcoin-cli /usr/local/bin/bitcoin-cli
 
@@ -168,9 +175,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # bitcoind binaries
-RUN mkdir -p /opt/bitcoind/v29.4.1.knots20260508-blake2b
-COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoind
-COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.1.knots20260508-blake2b/bitcoin-cli
+RUN mkdir -p /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoind    /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b/bitcoind
+COPY --from=bitcoind_blake2b /usr/local/bin/bitcoin-cli /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b/bitcoin-cli
 # The commit that binary was built from, so a running container can say exactly
 # what it is. The tag alone cannot: this is built from source, not from a signed
 # release, and a tag can be moved.
@@ -179,8 +186,15 @@ COPY --from=bitcoind_blake2b /etc/knots-pinned-commit   /etc/knots-pinned-commit
 # Give 1000:1000 write permisions to /opt/bitcoind (just directory) so we can flip the symbolic link while the container runs as 1000:1000
 RUN chown 1000:1000 /opt/bitcoind
 
+# A settings value stored before this release still names the old directory, and
+# the bitcoind manager builds its path straight from that string, so leave the
+# old name resolving to the same binary. Without it an explicit version choice
+# saved earlier points at a directory this image no longer has, and bitcoind
+# does not start.
+RUN ln -sfn /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b /opt/bitcoind/v29.4.1.knots20260508-blake2b
+
 # Symbolic link for default bitcoind binary
-RUN ln -sfn /opt/bitcoind/v29.4.1.knots20260508-blake2b /opt/bitcoind/current
+RUN ln -sfn /opt/bitcoind/v29.4.2.knots20260508rc2-blake2b /opt/bitcoind/current
 RUN ln -sfn /opt/bitcoind/current/bitcoind    /usr/local/bin/bitcoind
 RUN ln -sfn /opt/bitcoind/current/bitcoin-cli /usr/local/bin/bitcoin-cli
 
