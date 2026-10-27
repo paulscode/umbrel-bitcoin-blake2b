@@ -33,7 +33,7 @@ when there is a second BLAKE2b build to choose between.
 ## 2. bitcoind's shared libraries
 
 The images this replaced were built to be copied into an arbitrary runtime. Ours
-is a normal dynamically-linked Debian build, and `node:20-slim` carries neither
+is a normal dynamically-linked Debian build, and `node:24-slim` carries neither
 libevent nor libsqlite3, so the runtime and dev stages install them. Without it
 bitcoind exits immediately with `error while loading shared libraries:
 libevent_core-2.1.so.7`.
@@ -116,10 +116,12 @@ architectures being built, so publish that image first.
 docker run -d --rm --name uitest --user 1000:1000 -v /tmp/uidata:/data \
   -e RPC_USER=umbrel -e RPC_PASS=testpass -e APPS_SUBNET=10.99.0.0/16 \
   -e P2P_PORT=18444 -e P2P_WHITEBIND_PORT=18445 -e RPC_PORT=18443 \
-  -e TOR_HOST=10.99.0.72 -e I2P_HOST=10.99.0.73 -e I2P_SAM_PORT=7656 \
+  -e TOR_HOST=10.99.0.72 -e TOR_PORT=8334 -e TOR_SOCKS_PORT=9050 \
+  -e TOR_CONTROL_PORT=9051 -e TOR_CONTROL_PASSWORD=x \
+  -e I2P_HOST=10.99.0.73 -e I2P_SAM_PORT=7656 \
   -e BITCOIND_IP=<the container's own IP> -p 13000:3000 \
   paulscode/umbrel-bitcoin-blake2b:<tag>
-curl -s localhost:13000/api/bitcoind/version   # expect Bitcoin Knots v29.4.1.knots20260508
+curl -s localhost:13000/api/bitcoind/version   # expect Bitcoin Knots v29.4.3.knots20260508
 curl -s localhost:13000/api/widget/sync
 ```
 
@@ -127,7 +129,8 @@ curl -s localhost:13000/api/widget/sync
 generator writes `rpcbind=$BITCOIND_IP` and `rpcbind=127.0.0.1`; with both set to
 loopback bitcoind tries to bind the same endpoint twice and exits with "Address
 already in use". `I2P_HOST` must also be set, or `-i2psam=undefined:undefined`
-aborts startup. Both of those are set by the app's compose file and are only traps
+aborts startup, and without `TOR_SOCKS_PORT` the conf gets `onion=<host>:undefined` and bitcoind
+exits with "Invalid port specified in -onion". All of those are set by the app's compose file and are only traps
 when running the image by hand.
 
 Then confirm it is really the fork:
