@@ -14,6 +14,8 @@ import {
 	DefaultValuesForVersion,
 	resolveVersion,
 	LATEST,
+	VERSION_CHOICES,
+	DEFAULT_BITCOIN_KNOTS_VERSION,
 } from '#settings'
 
 const LEGACY_CONFIG_PATH = path.join(APP_STATE_DIR, 'bitcoin-config.json')
@@ -179,6 +181,32 @@ export async function migrateBip110() {
 		config.consensusrules = true
 		await writeWithBackup(SETTINGS_JSON, JSON.stringify(config, null, 2) + '\n')
 	}
+}
+
+// A version this image no longer lists, such as 'v29.4.3.knots20260508-blake2b'
+// after a move to a newer Knots, fails the settings schema, and ensureConfig would
+// then stop the app before bitcoind starts. There is one BLAKE2b build at a time,
+// and the image points every earlier version directory at it, so an earlier name
+// would resolve to the current build anyway. Pin it to the current build by name.
+// Any other value the schema would refuse (not a string, or no longer listed) is
+// treated the same way.
+export async function migrateRemovedVersion() {
+	if (!(await fse.pathExists(SETTINGS_JSON))) return
+
+	const config = await fse.readJson(SETTINGS_JSON).catch((err) => {
+		const msg =
+			err instanceof SyntaxError
+				? '[migration] Invalid JSON in settings.json'
+				: '[migration] Unable to read settings.json'
+		throw new Error(`${msg}: ${err.message}`)
+	})
+
+	if (!config || typeof config !== 'object' || Array.isArray(config) || !('version' in config)) return
+	const version = config.version
+	if (typeof version === 'string' && (VERSION_CHOICES as readonly string[]).includes(version)) return
+
+	config.version = DEFAULT_BITCOIN_KNOTS_VERSION
+	await writeWithBackup(SETTINGS_JSON, JSON.stringify(config, null, 2) + '\n')
 }
 
 // Previous app's bitcoin-config.json for reference:

@@ -18,8 +18,9 @@
 // 'v29.4.1.knots20260508-blake2b', 'v29.4.2.knots20260508-blake2b' or
 // 'v29.4.3.knots20260508-blake2b'. They are
 // deliberately not listed here: the image symlinks those directories to this one,
-// so a stored value still resolves to a binary, and listing them would offer a
-// second choice that is the same build.
+// and listing them would offer a second choice that is the same build. Such a value
+// fails the schema, so migrateRemovedVersion (apps/backend config/migration.ts)
+// rewrites it to this entry at startup.
 export const AVAILABLE_BITCOIN_KNOTS_VERSIONS = ['v29.5.knots20260508-blake2b'] as const
 
 // Default Bitcoin Knots version used by bitcoind manager (always the newest version in the array)
