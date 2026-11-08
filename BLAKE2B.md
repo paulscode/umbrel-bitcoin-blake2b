@@ -121,7 +121,7 @@ docker run -d --rm --name uitest --user 1000:1000 -v /tmp/uidata:/data \
   -e I2P_HOST=10.99.0.73 -e I2P_SAM_PORT=7656 \
   -e BITCOIND_IP=<the container's own IP> -p 13000:3000 \
   paulscode/umbrel-bitcoin-blake2b:<tag>
-curl -s localhost:13000/api/bitcoind/version   # expect Bitcoin Knots v29.4.3.knots20260508
+curl -s localhost:13000/api/bitcoind/version   # expect Bitcoin Knots v29.5.0.knots20260508
 curl -s localhost:13000/api/widget/sync
 ```
 
